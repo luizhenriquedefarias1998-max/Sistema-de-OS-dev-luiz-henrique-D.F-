@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Ordens de Serviço</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans p-6">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="flex justify-between items-center mb-6 bg-white p-6 rounded-lg shadow-sm">
+            <h1 class="text-2xl font-bold text-gray-800">🔧 Sistema de OS (dev luiz henrique D.F)</h1>
+            <div class="space-x-2">
+                <a href="/api/exportar/csv" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow text-sm font-medium">📥 Baixar CSV</a>
+                <a href="/api/exportar/pdf" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow text-sm font-medium">📥 Baixar PDF</a>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-lg shadow-sm h-fit">
+                <h2 class="text-lg font-semibold mb-4 text-gray-700">Nova Ordem de Serviço</h2>
+                <form id="osForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Título</label>
+                        <input type="text" id="titulo" required class="w-full mt-1 p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Descrição</label>
+                        <textarea id="descricao" rows="3" class="w-full mt-1 p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Prioridade</label>
+                        <select id="prioridade" class="w-full mt-1 p-2 border rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="Baixa">Baixa</option>
+                            <option value="Média">Média</option>
+                            <option value="Alta">Alta</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium transition shadow">Criar OS</button>
+                </form>
+            </div>
+
+            <div class="md:col-span-2 bg-white p-6 rounded-lg shadow-sm">
+                <h2 class="text-lg font-semibold mb-4 text-gray-700">Ordens de Serviço Ativas</h2>
+                <div id="listaOrdens" class="space-y-4">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('osForm');
+        const listaOrdens = document.getElementById('listaOrdens');
+
+        // Carregar Ordens da API
+        async function carregarOrdens() {
+            const res = await fetch('/api/ordens');
+            const ordens = await res.json();
+            
+            listaOrdens.innerHTML = ordens.length === 0 ? '<p class="text-gray-500 text-center py-4">Nenhuma ordem de serviço encontrada.</p>' : '';
+
+            ordens.forEach(os => {
+                const badgeColor = os.prioridade === 'Alta' ? 'bg-red-100 text-red-800' : os.prioridade === 'Média' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800';
+                
+                const card = document.createElement('div');
+                card.className = "p-4 border rounded-lg bg-gray-50 flex flex-col justify-between sm:flex-row sm:items-center gap-4";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded ${badgeColor}">${os.prioridade}</span>
+                            <h3 class="font-bold text-gray-800 text-base">#${os.id} - ${os.titulo}</h3>
+                        </div>
+                        <p class="text-sm text-gray-600">${os.descricao || '<em>Sem descrição.</em>'}</p>
+                    </div>
+                    <div>
+                        <select onchange="alterarStatus(${os.id}, this.value)" class="p-1.5 border rounded bg-white text-sm font-medium text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="Aberta" ${os.status === 'Aberta' ? 'selected' : ''}>Aberta</option>
+                            <option value="Em andamento" ${os.status === 'Em andamento' ? 'selected' : ''}>Em andamento</option>
+                            <option value="Concluída" ${os.status === 'Concluída' ? 'selected' : ''}>Concluída</option>
+                        </select>
+                    </div>
+                `;
+                listaOrdens.appendChild(card);
+            });
+        }
+
+        // Criar Nova Ordem
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const titulo = document.getElementById('titulo').value;
+            const descricao = document.getElementById('descricao').value;
+            const prioridade = document.getElementById('prioridade').value;
+
+            await fetch('/api/ordens', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ titulo, descricao, prioridade })
+            });
+
+            form.reset();
+            carregarOrdens();
+        });
+
+        // Atualizar Status da Ordem
+        async function alterarStatus(id, novoStatus) {
+            await fetch(`/api/ordens/${id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: novoStatus })
+            });
+            carregarOrdens();
+        }
+
+        // Inicializar a listagem
+        carregarOrdens();
+    </script>
+</body>
+</html>
